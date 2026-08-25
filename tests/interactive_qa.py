@@ -18,6 +18,8 @@ with sync_playwright() as p:
     page.goto(BASE_URL)
     page.wait_for_load_state("networkidle")
     expect(page.locator('.brand img').first).to_have_attribute('src', '/brand-logo-v2.png')
+    assert 'hero-luxury-v3.webp' in page.locator('.hero').evaluate("el => getComputedStyle(el).backgroundImage")
+    expect(page.locator('.property-primary').first).to_have_attribute('src', '/luxury/property-1-balcony.webp')
 
     page.get_by_label('Location').select_option(label='Son Tra')
     page.get_by_label('Monthly budget').select_option('under')
@@ -41,10 +43,17 @@ with sync_playwright() as p:
 
     page.locator('.quick-view-button').first.click()
     expect(page.locator('.property-modal')).to_be_visible()
+    expect(page.locator('.property-modal .modal-close')).to_be_focused()
+    expect(page.locator('.gallery-thumbs button')).to_have_count(3)
     first_image = page.locator('.modal-gallery > img').get_attribute('src')
     page.get_by_role('button', name='Next photo').click()
     expect(page.locator('.modal-gallery > img')).not_to_have_attribute('src', first_image)
+    expect(page.locator('.modal-gallery > img')).to_have_attribute('src', '/luxury/property-1-bedroom.webp')
     page.get_by_role('button', name='Close').click()
+
+    expect(page.locator('.signature-rail button')).to_have_count(6)
+    page.locator('.signature-rail button').first.click()
+    expect(page.locator('.signature-copy h2')).to_have_text('Oceanview Residence')
 
     page.get_by_test_id('saved-button').click()
     expect(page.get_by_role('heading', name='Your saved homes')).to_be_visible()
@@ -69,6 +78,7 @@ with sync_playwright() as p:
     expect(mobile.get_by_role('button', name='Menu')).to_be_visible()
     mobile.get_by_role('button', name='Menu').click()
     expect(mobile.get_by_role('dialog', name='Menu')).to_be_visible()
+    expect(mobile.get_by_role('button', name='Close menu')).to_be_focused()
     expect(mobile.get_by_role('link', name='01 Properties')).to_be_visible()
     mobile.screenshot(path=str(ARTIFACTS / 'mobile-menu.png'), full_page=True)
 
