@@ -16,17 +16,18 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://da-nang-real-estate-rentals.babaladen123.chatgpt.site'),
   title: 'Da Nang Real Estate | Apartments for Rent',
   description: 'Monthly and long-term apartment, villa and home rentals for foreigners in Da Nang.',
+  icons: { icon: '/icon.png', apple: '/icon.png' },
   openGraph: {
     title: 'Da Nang Real Estate | Monthly & Long-Term Rentals',
     description: 'Handpicked apartments, villas and homes for foreigners in Da Nang.',
     type: 'website',
-    images: [{ url: '/og.png', width: 1728, height: 921, alt: 'Da Nang Real Estate monthly and long-term rentals' }],
+    images: [{ url: '/og-v2.png', width: 1672, height: 941, alt: 'Da Nang Real Estate — find your place by the sea' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Da Nang Real Estate | Monthly & Long-Term Rentals',
     description: 'Handpicked apartments, villas and homes for foreigners in Da Nang.',
-    images: ['/og.png'],
+    images: ['/og-v2.png'],
   },
 };
 
