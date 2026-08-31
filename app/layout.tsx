@@ -14,19 +14,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://da-nang-real-estate-rentals.babaladen123.chatgpt.site'),
-  title: 'Da Nang Real Estate | Apartments for Rent',
-  description: 'Monthly and long-term apartment, villa and home rentals for foreigners in Da Nang.',
+  title: 'Da Nang Real Estate | Homes for Rent & Sale',
+  description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang, with bilingual local support.',
   icons: { icon: '/icon.png', apple: '/icon.png' },
   openGraph: {
-    title: 'Da Nang Real Estate | Monthly & Long-Term Rentals',
-    description: 'Handpicked apartments, villas and homes for foreigners in Da Nang.',
+    title: 'Da Nang Real Estate | Homes for Rent & Sale',
+    description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang.',
     type: 'website',
     images: [{ url: '/og-v2.png', width: 1672, height: 941, alt: 'Da Nang Real Estate — find your place by the sea' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Da Nang Real Estate | Monthly & Long-Term Rentals',
-    description: 'Handpicked apartments, villas and homes for foreigners in Da Nang.',
+    title: 'Da Nang Real Estate | Homes for Rent & Sale',
+    description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang.',
     images: ['/og-v2.png'],
   },
 };
