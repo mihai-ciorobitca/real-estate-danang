@@ -1,7 +1,13 @@
 import { SESSION_COOKIE } from '@/app/chatgpt-auth';
+import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
-  const response = Response.redirect(new URL('/', request.url), 303);
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  response.headers.append('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=0`);
+  const response = NextResponse.redirect(new URL('/', request.url), 303);
+  response.cookies.set(SESSION_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
   return response;
 }
