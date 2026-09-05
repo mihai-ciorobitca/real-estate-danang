@@ -177,7 +177,7 @@ export default function Home() {
     <main>
       <section className="hero" id="top">
         <div className="hero-shade" />
-        <nav className="nav shell" aria-label="Main navigation">
+        <div className="nav-wrap"><nav className="nav shell" aria-label="Main navigation">
           <a className="brand" href="#top" aria-label="Da Nang Real Estate home"><img src="/brand-logo-v2.png" alt="Da Nang Real Estate emblem" /><span><strong>DA NANG</strong><small>REAL ESTATE</small></span></a>
           <div className="navlinks"><a href="#properties">{t.nav[0]}</a><a href="#services">{t.nav[1]}</a><a href="#about">{t.nav[2]}</a><a href="#contact">{t.nav[3]}</a></div>
           <div className="nav-actions">
@@ -186,7 +186,7 @@ export default function Home() {
             <button className="nav-cta" type="button" onClick={openWizard}>{t.cta}</button>
             <button className="menu-button" type="button" onClick={() => setMobileMenu(true)} aria-label={ui.menu}><i /><i /></button>
           </div>
-        </nav>
+        </nav></div>
         <div className="hero-content shell">
           <p className="eyebrow">{t.eyebrow}</p><h1>{t.titleA}<br /><em>{t.titleB}</em></h1><p className="hero-copy">{t.hero}</p>
           <div className="searchbar" role="search" aria-label="Property search">

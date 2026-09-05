@@ -6,7 +6,7 @@ A Vercel-ready Next.js 16 application with a bilingual property website and a pa
 
 - Next.js App Router, React, TypeScript and Tailwind CSS
 - Supabase Postgres
-- Vercel Blob for property images
+- Supabase Storage for property images
 - Signed, HTTP-only admin sessions
 
 ## Local development
@@ -22,7 +22,7 @@ The database tables and the six starter properties are created automatically on 
 
 1. Push this folder to a GitHub repository and import it at https://vercel.com/new.
 2. Create a Supabase project. Under **Project Settings → Database**, copy the transaction-pooler connection string (port `6543`) and add it to Vercel as `DATABASE_URL`. Replace the password placeholder with your database password and keep `sslmode=require`.
-3. Create a **Blob** store and connect it to the project. Confirm that `BLOB_READ_WRITE_TOKEN` was added.
+3. In Supabase Storage, create a public bucket named `property-images`. Add `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET=property-images` to Vercel. Never expose the service-role key in browser code.
 4. Add these environment variables for Production, Preview, and Development:
    - `ADMIN_EMAIL`
    - `ADMIN_PASSWORD`
