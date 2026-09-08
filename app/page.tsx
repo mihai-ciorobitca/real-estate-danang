@@ -2,6 +2,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, ArrowUpRight, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import PropertyCard from './property-card';
+import './atelier.css';
 import type { PropertyRecord, TransactionType } from '@/lib/property-types';
 
 type Language = 'en' | 'vi';
@@ -63,6 +66,7 @@ export default function Home() {
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizard, setWizard] = useState({ area: '', type: '', move: '' });
@@ -174,8 +178,9 @@ export default function Home() {
     : `Xin chào, tôi đang tìm ${wizard.type || 'nhà ở'} tại ${wizard.area || 'Đà Nẵng'}. Thời gian chuyển vào: ${wizard.move || 'linh hoạt'}. Vui lòng gửi cho tôi các lựa chọn thuê dài hạn phù hợp.`);
 
   return (
-    <main>
+    <main className="atelier">
       <section className="hero" id="top">
+        <div className="hero-visual" />
         <div className="hero-shade" />
         <div className="nav-wrap"><nav className="nav shell" aria-label="Main navigation">
           <a className="brand" href="#top" aria-label="Da Nang Real Estate home"><img src="/brand-logo-v2.png" alt="Da Nang Real Estate emblem" /><span><strong>DA NANG</strong><small>REAL ESTATE</small></span></a>
@@ -189,32 +194,31 @@ export default function Home() {
         </nav></div>
         <div className="hero-content shell">
           <p className="eyebrow">{t.eyebrow}</p><h1>{t.titleA}<br /><em>{t.titleB}</em></h1><p className="hero-copy">{t.hero}</p>
-          <div className="searchbar" role="search" aria-label="Property search">
+          <div className="hero-actions"><button className="gold-button" onClick={showResults}>{t.explore}<ArrowRight size={18} /></button><button className="hero-concierge" onClick={openWizard}>{language === 'en' ? 'Find a home with us' : 'Cùng tìm ngôi nhà của bạn'}<ArrowUpRight size={18} /></button></div>
+        </div>
+        <p className="hero-note">{t.scroll}<span aria-hidden="true">↓</span></p>
+      </section>
+
+      <section className="collection" id="properties"><div className="shell"><div className="collection-search">
+          <button className="search-toggle" type="button" aria-expanded={searchExpanded} aria-controls="home-filters" onClick={() => setSearchExpanded(!searchExpanded)}><SlidersHorizontal size={18} /><span>{language === 'en' ? 'Refine your search' : 'Tùy chỉnh tìm kiếm'}</span><ChevronDown size={18} /></button>
+          <div id="home-filters" className={`searchbar ${searchExpanded ? 'is-expanded' : ''}`} role="search" aria-label="Property search">
             <label><span>{t.deal}</span><select value={dealType} onChange={(e) => { setDealType(e.target.value as TransactionType); setBudget('all'); }} aria-label={t.deal}><option value="rent">{t.rent}</option><option value="sale">{t.buy}</option></select></label>
             <label><span>{t.location}</span><select value={location} onChange={(e) => setLocation(e.target.value)} aria-label={t.location}><option value="all">{t.allLocations}</option>{locations.map((area) => <option key={area}>{area}</option>)}</select></label>
             <label><span>{t.propertyType}</span><select value={type} onChange={(e) => setType(e.target.value)} aria-label={t.propertyType}><option value="all">{t.anyProperty}</option>{propertyTypes.map((propertyType) => <option key={propertyType} value={propertyType}>{language === 'vi' && propertyType === 'Apartment' ? t.apartment : language === 'vi' && propertyType === 'Villa' ? t.villa : language === 'vi' && propertyType === 'House' ? t.house : propertyType}</option>)}</select></label>
             <label><span>{t.budget}</span><select value={budget} onChange={(e) => setBudget(e.target.value)} aria-label={t.budget}><option value="all">{t.anyBudget}</option><option value="under">{dealType === 'sale' ? t.saleUnder : t.under10}</option><option value="mid">{dealType === 'sale' ? t.saleMid : t.from10}</option><option value="high">{dealType === 'sale' ? t.saleHigh : t.over20}</option></select></label>
             <button className="search-button" type="button" onClick={showResults}>{t.explore}<span>{String(filtered.length).padStart(2, '0')}</span></button>
-          </div>
-        </div>
-        <p className="hero-note">{t.scroll}<span aria-hidden="true">↓</span></p>
-      </section>
-
-      <section className="collection" id="properties"><div className="shell">
+          </div></div>
         <header className="section-heading split-heading"><div><p className="eyebrow dark">{t.collectionEyebrow}</p><h2>{t.collectionTitle}</h2></div><p>{t.collectionCopy}</p></header>
         <div className="results-row"><span><strong>{String(filtered.length).padStart(2, '0')}</strong> {t.homesFound}</span><div className="results-actions">{(location !== 'all' || type !== 'all' || budget !== 'all') && <button onClick={clearFilters}>{t.reset} ×</button>}<div className="view-switch" aria-label="View style"><button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'}>▦ {ui.grid}</button><button className={viewMode === 'map' ? 'active' : ''} onClick={() => setViewMode('map')} aria-pressed={viewMode === 'map'}>⌖ {ui.map}</button></div></div></div>
 
         {filtered.length === 0 ? <div className="empty-state"><p>{t.noHomes}</p><button onClick={clearFilters}>{t.reset}</button></div> : viewMode === 'grid' ?
-          <div className="property-grid">{filtered.map((property, index) => <article className={`property-card ${property.featured ? 'featured' : ''}`} key={property.id}>
-            <div className="property-image"><img className="property-primary" src={property.images[0] || '/hero.jpg'} alt={property.name[language]} />{property.images.length > 1 && <img className="property-secondary" src={property.images[1]} alt="" aria-hidden="true" />}<span className="property-tag">{property.tag[language]}</span><span className="property-count">{String(index + 1).padStart(2, '0')}</span><span className="photo-count">{String(property.images.length).padStart(2, '0')} {language === 'en' ? 'PHOTOS' : 'ẢNH'}</span><button className={`favorite-button ${favorites.includes(property.id) ? 'active' : ''}`} type="button" onClick={() => toggleFavorite(property.id)} aria-label={favorites.includes(property.id) ? ui.remove : ui.save} aria-pressed={favorites.includes(property.id)}>♥</button></div>
-            <div className="property-body"><p className="property-place">{property.area} · {language === 'en' ? property.type : property.type === 'Apartment' ? t.apartment : property.type === 'Villa' ? t.villa : property.type === 'House' ? t.house : property.type}</p><h3>{property.name[language]}</h3><p className="price">{formatPrice(property.price)} <small>{priceSuffix(property)}</small></p><div className="property-meta"><span>⌂ {property.beds} {t.beds}</span><span>◫ {property.baths} {t.baths}</span><span>↔ {property.size} m²</span></div><button className="quick-view-button" type="button" onClick={() => openProperty(property.id)}>{t.view}<span>↗</span></button></div>
-          </article>)}</div> :
+          <div className="property-grid">{filtered.map((property, index) => <PropertyCard key={property.id} property={property} language={language} index={index} saved={favorites.includes(property.id)} onSave={() => toggleFavorite(property.id)} onOpen={() => openProperty(property.id)} />)}</div> :
           <div className="map-layout"><div className="property-map" aria-label="Da Nang property map"><div className="river" /><span className="map-label sea">EAST SEA</span><span className="map-label center">HAI CHAU</span><span className="map-label beach">MY KHE</span>{filtered.map((property) => <button key={property.id} type="button" className={`map-pin ${mapProperty?.id === property.id ? 'active' : ''}`} style={{ left: `${property.x}%`, top: `${property.y}%` }} onClick={() => setMapSelectedId(property.id)} aria-label={property.name[language]}><span>{formatShortPrice(property)}</span></button>)}<p className="map-hint">⌖ {ui.mapHint}</p></div>{mapProperty && <article className="map-preview"><img src={mapProperty.images[0] || '/hero.jpg'} alt={mapProperty.name[language]} /><div><p className="property-place">{mapProperty.area}</p><h3>{mapProperty.name[language]}</h3><p className="price">{formatPrice(mapProperty.price)} <small>{priceSuffix(mapProperty)}</small></p><div className="property-meta"><span>⌂ {mapProperty.beds}</span><span>◫ {mapProperty.baths}</span><span>↔ {mapProperty.size} m²</span></div><button className="quick-view-button" onClick={() => openProperty(mapProperty.id)}>{t.view}<span>↗</span></button></div></article>}</div>}
       </div></section>
 
       {storyProperty && <section className="signature-story" aria-label={language === 'en' ? 'Signature collection' : 'Bộ sưu tập đặc biệt'}><div className="shell signature-layout"><div className="signature-copy"><p className="eyebrow">{language === 'en' ? 'THE PRIVATE COLLECTION' : 'BỘ SƯU TẬP RIÊNG'}</p><p className="signature-number">{String(storyIndex + 1).padStart(2, '0')} / {String(storyProperties.length).padStart(2, '0')}</p><h2>{storyProperty.name[language]}</h2><p>{language === 'en' ? 'A closer look at the spaces, views and quiet details that make a home exceptional.' : 'Khám phá không gian, tầm nhìn và những chi tiết tinh tế tạo nên một ngôi nhà đặc biệt.'}</p><button className="gold-button magnetic-button" type="button" onClick={() => openProperty(storyProperty.id)}>{t.view}<span>↗</span></button></div><div className="signature-stage"><img key={storyProperty.id} src={storyProperty.images[1] || storyProperty.images[0] || '/hero.jpg'} alt={storyProperty.name[language]} /><span>{storyProperty.area}</span></div><div className="signature-rail">{storyProperties.map((property, index) => <button key={property.id} className={storyIndex === index ? 'active' : ''} type="button" onClick={() => setStoryIndex(index)} aria-label={property.name[language]}><img src={property.images[0] || '/hero.jpg'} alt="" /><span>{String(index + 1).padStart(2, '0')}</span></button>)}</div></div></section>}
 
-      <section className="services" id="services"><div className="shell"><header className="section-heading split-heading light"><div><p className="eyebrow">{t.serviceEyebrow}</p><h2>{t.serviceTitle}</h2></div><p>{language === 'en' ? 'A straightforward rental experience, built around clear communication and dependable local help.' : 'Trải nghiệm thuê nhà đơn giản với giao tiếp rõ ràng và hỗ trợ địa phương đáng tin cậy.'}</p></header><div className="service-grid">{t.services.map(([number, title, description]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{description}</p><button type="button" onClick={openWizard} aria-label={`${title} — ${t.cta}`}>↗</button></article>)}</div></div></section>
+      <section className="services" id="services"><div className="shell"><header className="section-heading split-heading light"><div><p className="eyebrow">{t.serviceEyebrow}</p><h2>{t.serviceTitle}</h2></div><p>{language === 'en' ? 'A straightforward rental experience, built around clear communication and dependable local help.' : 'Trải nghiệm thuê nhà đơn giản với giao tiếp rõ ràng và hỗ trợ địa phương đáng tin cậy.'}</p></header><div className="service-grid">{t.services.map(([number, title, description], index) => <article className="service-card" key={number}><img className="service-art" src={['/luxury/property-2-living.webp','/luxury/property-3-courtyard.webp','/luxury/property-5-pool.webp'][index]} alt="" /><div className="service-shade" /><span className="service-number">{number}</span><div className="service-copy"><h3>{title}</h3><p>{description}</p><button type="button" onClick={openWizard} aria-label={`${title} — ${t.cta}`}><span>{t.cta}</span><ArrowUpRight size={18} /></button></div></article>)}</div></div></section>
 
       <section className="about" id="about"><div className="about-image"><img src="/luxury/property-3-courtyard.webp" alt="Luxury tropical courtyard residence in Da Nang" /><div className="roundel"><img src="/brand-logo-v2.png" alt="" /><span>DA NANG<br />REAL ESTATE</span></div></div><div className="about-copy"><p className="eyebrow dark">{t.aboutEyebrow}</p><h2>{t.aboutTitle}</h2><p>{t.aboutCopy}</p><div className="about-actions"><a href="tel:+84982545957">{t.call}<span>↗</span></a><a href="https://wa.me/84982545957" target="_blank" rel="noreferrer">{t.whatsapp}<span>↗</span></a><a href="https://zalo.me/84982545957" target="_blank" rel="noreferrer">{t.zalo}<span>↗</span></a></div></div></section>
       <section className="stats"><div className="shell stats-grid">{t.stats.map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}</div></section>
