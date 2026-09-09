@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Manrope } from 'next/font/google';
 import './globals.css';
 
 function siteUrl() {
@@ -20,6 +20,8 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 });
+
+const editorial = Manrope({ variable: '--font-editorial', subsets: ['latin', 'vietnamese'], display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(),
@@ -48,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${editorial.variable} antialiased`}
       >
         {children}
       </body>
