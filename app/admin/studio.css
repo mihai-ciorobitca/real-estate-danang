@@ -33,3 +33,5 @@
  .editor-footer>span{display:flex;}.editor-footer{justify-content:space-between;}
 }
 @media(max-width:420px) {.admin-sidebar nav .active{display:none;}.admin-sidebar nav{gap:0;flex-direction:column;align-items:flex-end}.admin-sidebar nav a,.admin-sidebar nav button{min-height:32px;padding:5px 8px;font-size:11px}.admin-metrics article>span{display:none;}}
+
+.admin-brand img,.studio-login-scene img { background:#071c2c; border-radius:50%; padding:3px; }

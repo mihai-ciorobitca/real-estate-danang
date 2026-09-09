@@ -196,7 +196,7 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
     <main className="admin-shell" lang={language}>
       <aside className="admin-sidebar">
         <Link className="admin-brand" href="/" aria-label="Da Nang Real Estate website">
-          <img src="/luxury/brand-coastal-v4.png" alt="" />
+          <img src="/luxury/brand-dragon-v5.png" alt="" />
           <span><b>DA NANG</b><small>{t("PROPERTY ADMIN", "QUẢN LÝ NHÀ ĐẤT")}</small></span>
         </Link>
         <nav aria-label={t('Admin navigation','Điều hướng quản trị')}>

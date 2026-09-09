@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   metadataBase: siteUrl(),
   title: 'Da Nang Real Estate | Homes for Rent & Sale',
   description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang, with bilingual local support.',
-  icons: { icon: '/luxury/brand-coastal-v4.png', apple: '/luxury/brand-coastal-v4.png' },
+  icons: { icon: '/luxury/brand-dragon-v5.png', apple: '/luxury/brand-dragon-v5.png' },
   openGraph: {
     title: 'Da Nang Real Estate | Homes for Rent & Sale',
     description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang.',

@@ -20,3 +20,6 @@ Compared generated hero, inventory and admin references against browser renders 
 - Interaction: verified Vietnamese search, locale persistence, new-listing validation, Escape dismissal, property galleries, favorites and details in browser. Preview is clearly labeled, development-only and does not save, upload or delete.
 - Production boundary: /admin-preview returns 404, /admin redirects unauthenticated requests, admin inventory API returns 401. Production database writes and Supabase uploads not exercised because no production credentials were loaded.
 - Checks: Next production build and TypeScript passed. ESLint has no errors; existing img-element advisory warnings remain.
+
+## Logo correction
+User requested preservation of the original identity. Replaced the arch logo with GPT-refined circular gold/navy dragon-bridge, skyline and waves emblem (brand-dragon-v5.png), across website, admin, login and favicons.

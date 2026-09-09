@@ -52,3 +52,6 @@ main.atelier { --ivory:#f6f5ef; --paper:#fffefa; --navy:#102d32; --ink:#102d32; 
 @media(prefers-reduced-motion:reduce) { .atelier *, .atelier *::before,.atelier *::after {animation:none!important;transition:none!important;scroll-behavior:auto!important;} }
 .atelier .menu-button i {background:#102d32;}
 .atelier .saved-nav>span {color:#102d32;}
+
+/* Preserve the original circular gold-and-navy identity. */
+.atelier .brand img { background:#071c2c; border-radius:50%; padding:2px; }
