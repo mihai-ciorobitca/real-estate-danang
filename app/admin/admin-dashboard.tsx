@@ -1,9 +1,12 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import LanguageSwitch from '../language-switch';
+import { useAdminLanguage } from './use-admin-language';
+import { adminError } from './error-message';
 import {
-  Archive, ArrowLeft, BedDouble, Building2, Check, ChevronDown, Eye, FilePenLine,
+  Archive, ArrowLeft, Building2, Check, ChevronDown, Eye, FilePenLine,
   ImagePlus, LayoutDashboard, LoaderCircle, LogOut, MapPin, Plus, Search, Sparkles,
   Trash2, Upload, X,
 } from 'lucide-react';
@@ -13,6 +16,7 @@ type Props = {
   initialProperties: PropertyRecord[];
   currentUser: string;
   signOutPath: string;
+  preview?: boolean;
 };
 
 type EditorRecord = PropertyInput & { id?: number };
@@ -49,11 +53,13 @@ function money(value: number) {
   return `${new Intl.NumberFormat('vi-VN').format(value)} ₫`;
 }
 
-const statusLabels: Record<PropertyStatus, string> = {
-  draft: 'Draft', published: 'Live', sold: 'Sold', rented: 'Rented', archived: 'Archived',
-};
 
-export default function AdminDashboard({ initialProperties, currentUser, signOutPath }: Props) {
+
+export default function AdminDashboard({ initialProperties, currentUser, signOutPath, preview = false }: Props) {
+  const { language, changeLanguage, t } = useAdminLanguage();
+  const typeLabel = (value: string) => language === 'vi' ? ({ Apartment:'Căn hộ', Villa:'Biệt thự', House:'Nhà riêng', Studio:'Studio', Land:'Đất' }[value] || value) : value;
+  const statusLabels: Record<PropertyStatus, string> = { draft:t('Draft','Bản nháp'), published:t('Live','Đang hiển thị'), sold:t('Sold','Đã bán'), rented:t('Rented','Đã cho thuê'), archived:t('Archived','Đã lưu trữ') };
+  const [sort, setSort] = useState('recent');
   const [properties, setProperties] = useState(initialProperties);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | PropertyStatus>('all');
@@ -64,12 +70,31 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
   const [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const dialogRef = useRef<HTMLElement>(null);
+  const editorOpen = editor !== null;
+  useEffect(() => {
+    if (!editorOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving && !uploading) setEditor(null);
+      if (event.key !== 'Tab') return;
+      const nodes = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,a[href]') || []).filter(node => node.offsetParent !== null);
+      const first = nodes[0], last = nodes[nodes.length-1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); previous?.focus(); };
+  }, [editorOpen, saving, uploading]);
   const filtered = useMemo(() => properties.filter((property) => {
     const needle = query.trim().toLowerCase();
     const matchesQuery = !needle || [property.name.en, property.name.vi, property.area, property.type, property.slug]
       .some((value) => value.toLowerCase().includes(needle));
     return matchesQuery && (statusFilter === 'all' || property.status === statusFilter);
-  }), [properties, query, statusFilter]);
+  }).sort((a,b) => sort === 'price' ? b.price-a.price : sort === 'name' ? a.name[language].localeCompare(b.name[language], language) : Date.parse(b.updatedAt)-Date.parse(a.updatedAt)), [properties, query, statusFilter, sort, language]);
 
   const metrics = {
     total: properties.length,
@@ -92,12 +117,16 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
   async function refreshInventory() {
     const response = await fetch('/api/admin/properties', { cache: 'no-store' });
     const data = await response.json() as { properties?: PropertyRecord[]; error?: string };
-    if (!response.ok || !data.properties) throw new Error(data.error ?? 'Could not refresh inventory.');
+    if (!response.ok || !data.properties) throw new Error(data.error ?? t("Could not refresh inventory.", "Không thể tải lại danh sách."));
     setProperties(data.properties);
   }
 
   async function saveProperty() {
     if (!editor) return;
+    if (!editor.name.en.trim() || !editor.name.vi.trim() || !editor.area.trim() || !editor.type.trim()) { setError(t('Complete both titles, area and property type.','Vui lòng nhập tên ở cả hai ngôn ngữ, khu vực và loại bất động sản.')); return; }
+    if (!Number.isFinite(editor.price) || editor.price < 0 || editor.size < 1) { setError(t('Enter a valid price and size.','Vui lòng nhập giá và diện tích hợp lệ.')); return; }
+    if (editor.status === 'published' && !editor.images.length) { setError(t('Add at least one image before publishing.','Thêm ít nhất một ảnh trước khi đăng tin.')); return; }
+    if (preview) { setNotice(t('Design preview only. Changes are not saved.','Đây là bản xem thử. Thay đổi không được lưu.')); setEditor(null); return; }
     setSaving(true); setError(''); setNotice('');
     try {
       const endpoint = editor.id ? `/api/admin/properties/${editor.id}` : '/api/admin/properties';
@@ -107,16 +136,17 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
         body: JSON.stringify(editor),
       });
       const data = await response.json() as { property?: PropertyRecord; error?: string };
-      if (!response.ok || !data.property) throw new Error(data.error ?? 'Could not save this property.');
+      if (!response.ok || !data.property) throw new Error(data.error ?? t("Could not save this property.", "Không thể lưu bất động sản."));
       await refreshInventory();
       setEditor(null);
-      setNotice(editor.id ? 'Property updated.' : 'New property created.');
+      setNotice(editor.id ? t("Property updated.", "Đã cập nhật bất động sản.") : t("New property created.", "Đã tạo bất động sản mới."));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save this property.');
+      setError(caught instanceof Error ? adminError(caught.message, language) : t("Could not save this property.", "Không thể lưu bất động sản."));
     } finally { setSaving(false); }
   }
 
   async function quickStatus(property: PropertyRecord, status: PropertyStatus) {
+    if (preview) { setNotice(t('Design preview only. Status is not changed.','Đây là bản xem thử. Trạng thái không thay đổi.')); return; }
     setError('');
     try {
       const response = await fetch(`/api/admin/properties/${property.id}`, {
@@ -124,163 +154,167 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
         body: JSON.stringify({ ...toEditor(property), status }),
       });
       const data = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? 'Could not update status.');
+      if (!response.ok) throw new Error(data.error ?? t("Could not update status.", "Không thể cập nhật trạng thái."));
       await refreshInventory();
-      setNotice(status === 'published' ? 'Property is now live.' : 'Property moved to drafts.');
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not update status.'); }
+      setNotice(status === 'published' ? t("Property is now live.", "Bất động sản đã hiển thị trên website.") : t("Property moved to drafts.", "Đã chuyển bất động sản về bản nháp."));
+    } catch (caught) { setError(caught instanceof Error ? adminError(caught.message, language) : t("Could not update status.", "Không thể cập nhật trạng thái.")); }
   }
 
   async function removeProperty(property: PropertyRecord) {
-    if (!window.confirm(`Delete “${property.name.en}”? This cannot be undone.`)) return;
+    if (preview) { setNotice(t('Design preview only. No properties are deleted.','Đây là bản xem thử. Không xóa bất động sản.')); return; }
+    if (!window.confirm(t(`Delete “${property.name[language]}”? This cannot be undone.`, `Xóa “${property.name[language]}”? Không thể hoàn tác thao tác này.`))) return;
     setError('');
     try {
       const response = await fetch(`/api/admin/properties/${property.id}`, { method: 'DELETE' });
       const data = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? 'Could not delete this property.');
+      if (!response.ok) throw new Error(data.error ?? t("Could not delete this property.", "Không thể xóa bất động sản."));
       setProperties((current) => current.filter((item) => item.id !== property.id));
-      setNotice('Property deleted.');
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not delete this property.'); }
+      setNotice(t("Property deleted.", "Đã xóa bất động sản."));
+    } catch (caught) { setError(caught instanceof Error ? adminError(caught.message, language) : t("Could not delete this property.", "Không thể xóa bất động sản.")); }
   }
 
   async function uploadImages(files: FileList | null) {
     if (!editor || !files?.length) return;
+    if (preview) { setError(t('Uploads are available in the signed-in dashboard.','Đăng nhập bảng quản trị để tải ảnh lên.')); return; }
     setUploading(true); setError('');
     try {
-      const uploaded: string[] = [];
+      if (editor.images.length + files.length > 12) throw new Error(t('A maximum of 12 images is allowed.','Chỉ được tải tối đa 12 ảnh.'));
+      if (Array.from(files).some(file => file.size > 4 * 1024 * 1024)) throw new Error(t('Each image must be smaller than 4 MB.','Mỗi ảnh phải nhỏ hơn 4 MB.'));
       for (const file of Array.from(files)) {
         const body = new FormData(); body.append('file', file);
         const response = await fetch('/api/admin/uploads', { method: 'POST', body });
         const data = await response.json() as { url?: string; error?: string };
-        if (!response.ok || !data.url) throw new Error(data.error ?? `Could not upload ${file.name}.`);
-        uploaded.push(data.url);
+        if (!response.ok || !data.url) throw new Error(data.error ?? t(`Could not upload ${file.name}.`, `Không thể tải ảnh ${file.name}.`));
+        const url = data.url; setEditor(current => current ? { ...current, images: [...current.images, url] } : current);
       }
-      setEditor((current) => current ? { ...current, images: [...current.images, ...uploaded].slice(0, 12) } : current);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Image upload failed.'); }
+
+    } catch (caught) { setError(caught instanceof Error ? adminError(caught.message, language) : t("Image upload failed.", "Không thể tải ảnh lên.")); }
     finally { setUploading(false); if (fileInput.current) fileInput.current.value = ''; }
   }
 
   return (
-    <main className="admin-shell">
+    <main className="admin-shell" lang={language}>
       <aside className="admin-sidebar">
         <Link className="admin-brand" href="/" aria-label="Da Nang Real Estate website">
-          <img src="/brand-logo-v2.png" alt="" />
-          <span><b>DA NANG</b><small>PROPERTY ADMIN</small></span>
+          <img src="/luxury/brand-coastal-v4.png" alt="" />
+          <span><b>DA NANG</b><small>{t("PROPERTY ADMIN", "QUẢN LÝ NHÀ ĐẤT")}</small></span>
         </Link>
-        <nav aria-label="Admin navigation">
-          <a className="active" href="#inventory"><LayoutDashboard size={18} /> Inventory</a>
-          <button type="button" onClick={openNew}><Plus size={18} /> Add property</button>
-          <Link href="/" target="_blank"><Eye size={18} /> View website</Link>
+        <nav aria-label={t('Admin navigation','Điều hướng quản trị')}>
+          <a className="active" href="#inventory"><LayoutDashboard size={18} /> {t("Inventory", "Quản lý nhà đất")}</a>
+          <button type="button" onClick={openNew}><Plus size={18} /> {t("Add property", "Thêm bất động sản")}</button>
+          <Link href="/" target="_blank"><Eye size={18} /> {t("View website", "Xem website")}</Link>
         </nav>
         <div className="admin-profile">
           <span>{currentUser.slice(0, 1).toUpperCase()}</span>
-          <div><b>{currentUser}</b><small>Administrator</small></div>
-          <a href={signOutPath} target="_top" aria-label="Sign out"><LogOut size={17} /></a>
+          <div><b>{currentUser}</b><small>{t("Administrator", "Quản trị viên")}</small></div>
+          <a href={signOutPath} target="_top" aria-label={t("Sign out", "Đăng xuất")}><LogOut size={17} /></a>
         </div>
       </aside>
 
       <section className="admin-workspace" id="inventory">
-        <header className="admin-topbar">
-          <div><p>PROPERTY OPERATIONS</p><h1>Inventory control</h1></div>
-          <button className="admin-primary" type="button" onClick={openNew}><Plus size={18} /> Add new property</button>
+        {preview && <p className="preview-notice">{t('Local design preview · sample listings · saving disabled','Bản xem thử cục bộ · dữ liệu mẫu · không lưu thay đổi')}</p>}
+        <header className="admin-topbar"><LanguageSwitch language={language} onChange={changeLanguage} />
+          <div><p>{t("PROPERTY OPERATIONS", "DA NANG REAL ESTATE")}</p><h1>{t("Inventory control", "Không gian quản lý.")}</h1></div>
+          <button className="admin-primary" type="button" onClick={openNew}><Plus size={18} /> {t("Add new property", "Thêm bất động sản")}</button>
         </header>
 
         {(notice || error) && <div className={`admin-notice ${error ? 'error' : ''}`} role="status">
           {error ? <X size={17} /> : <Check size={17} />}{error || notice}
-          <button type="button" onClick={() => { setNotice(''); setError(''); }} aria-label="Dismiss"><X size={15} /></button>
+          <button type="button" onClick={() => { setNotice(''); setError(''); }} aria-label={t("Dismiss", "Đóng thông báo")}><X size={15} /></button>
         </div>}
 
-        <div className="admin-metrics">
-          <article><span><Building2 size={19} /></span><div><small>Total inventory</small><strong>{String(metrics.total).padStart(2, '0')}</strong></div></article>
-          <article><span><Eye size={19} /></span><div><small>Live on website</small><strong>{String(metrics.live).padStart(2, '0')}</strong></div></article>
-          <article><span><FilePenLine size={19} /></span><div><small>Drafts</small><strong>{String(metrics.draft).padStart(2, '0')}</strong></div></article>
-          <article><span><Sparkles size={19} /></span><div><small>For sale</small><strong>{String(metrics.sale).padStart(2, '0')}</strong></div></article>
+        <div className="admin-welcome"><div><h2>{t('A new day. A new home.','Một ngày mới. Một tổ ấm mới.')}</h2><p>{t('Your properties, beautifully organised.','Quản lý bất động sản của bạn, đơn giản và tinh tế.')}</p><a href="/" target="_blank" rel="noreferrer">{t('Explore the website','Khám phá website')} <Eye size={16}/></a></div></div><div className="admin-metrics">
+          <article><span><Building2 size={19} /></span><div><small>{t("Total inventory", "Tổng bất động sản")}</small><strong>{String(metrics.total).padStart(2, '0')}</strong></div></article>
+          <article><span><Eye size={19} /></span><div><small>{t("Live on website", "Đang hiển thị")}</small><strong>{String(metrics.live).padStart(2, '0')}</strong></div></article>
+          <article><span><FilePenLine size={19} /></span><div><small>{t("Drafts", "Bản nháp")}</small><strong>{String(metrics.draft).padStart(2, '0')}</strong></div></article>
+          <article><span><Sparkles size={19} /></span><div><small>{t("For sale", "Đang bán")}</small><strong>{String(metrics.sale).padStart(2, '0')}</strong></div></article>
         </div>
 
         <div className="inventory-toolbar">
-          <label className="admin-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, area or type…" /></label>
-          <label className="admin-select"><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | PropertyStatus)}><option value="all">All statuses</option><option value="published">Live</option><option value="draft">Draft</option><option value="sold">Sold</option><option value="rented">Rented</option><option value="archived">Archived</option></select><ChevronDown size={16} /></label>
-          <span>{filtered.length} {filtered.length === 1 ? 'property' : 'properties'}</span>
+          <label className="admin-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search name, area or type…", "Tìm theo tên, khu vực hoặc loại nhà…")} /></label>
+          <label className="admin-select"><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | PropertyStatus)}><option value="all">{t("All statuses", "Tất cả trạng thái")}</option><option value="published">{t("Live", "Đang hiển thị")}</option><option value="draft">{t("Draft", "Bản nháp")}</option><option value="sold">{t("Sold", "Đã bán")}</option><option value="rented">{t("Rented", "Đã cho thuê")}</option><option value="archived">{t("Archived", "Đã lưu trữ")}</option></select><ChevronDown size={16} /></label>
+          <select className="admin-sort" aria-label={t('Sort listings','Sắp xếp tin đăng')} value={sort} onChange={event => setSort(event.target.value)}><option value="recent">{t('Recently updated','Cập nhật gần đây')}</option><option value="price">{t('Highest price','Giá cao nhất')}</option><option value="name">{t('Name A–Z','Tên A–Z')}</option></select><span>{filtered.length} {t(filtered.length === 1 ? 'property' : 'properties', 'bất động sản')}</span>
         </div>
 
         <div className="inventory-list">
-          <div className="inventory-head"><span>Property</span><span>Deal</span><span>Price</span><span>Status</span><span>Updated</span><span>Actions</span></div>
+          <div className="inventory-head"><span>{t("Property", "Bất động sản")}</span><span>{t("Deal", "Giao dịch")}</span><span>{t("Price", "Giá")}</span><span>{t("Status", "Trạng thái")}</span><span>{t("Updated", "Cập nhật")}</span><span>{t("Actions", "Thao tác")}</span></div>
           {filtered.map((property) => <article className="inventory-row" key={property.id}>
             <button className="property-summary" type="button" onClick={() => openEdit(property)}>
               <img src={property.images[0] || '/hero.jpg'} alt="" />
-              <span><b>{property.name.en}</b><small><MapPin size={13} /> {property.area} · {property.type}</small></span>
+              <span><b>{property.name[language] || property.name.en}</b><small><MapPin size={13} /> {property.area} · {typeLabel(property.type)}</small></span>
             </button>
-            <span className={`deal-pill ${property.transactionType}`}>{property.transactionType === 'sale' ? 'For sale' : 'Rental'}</span>
-            <b className="inventory-price">{money(property.price)}{property.transactionType === 'rent' && <small>/month</small>}</b>
+            <span className={`deal-pill ${property.transactionType}`}>{property.transactionType === 'sale' ? t("For sale", "Đang bán") : t("Rental", "Cho thuê")}</span>
+            <b className="inventory-price">{money(property.price)}{property.transactionType === 'rent' && <small>{t("/month", "/tháng")}</small>}</b>
             <span className={`status-pill ${property.status}`}><i />{statusLabels[property.status]}</span>
-            <time dateTime={property.updatedAt}>{new Date(property.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</time>
+            <time dateTime={property.updatedAt}>{new Date(property.updatedAt).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</time>
             <div className="row-actions">
-              <button type="button" onClick={() => openEdit(property)} aria-label={`Edit ${property.name.en}`}><FilePenLine size={17} /></button>
-              <button type="button" onClick={() => quickStatus(property, property.status === 'published' ? 'draft' : 'published')} aria-label={property.status === 'published' ? 'Move to drafts' : 'Publish'}>{property.status === 'published' ? <Archive size={17} /> : <Eye size={17} />}</button>
-              <button className="danger" type="button" onClick={() => removeProperty(property)} aria-label={`Delete ${property.name.en}`}><Trash2 size={17} /></button>
+              <button type="button" onClick={() => openEdit(property)} aria-label={`${t('Edit','Chỉnh sửa')} ${property.name[language]}`}><FilePenLine size={17} /></button>
+              <button type="button" onClick={() => quickStatus(property, property.status === 'published' ? 'draft' : 'published')} aria-label={property.status === 'published' ? t("Move to drafts", "Chuyển về bản nháp") : t("Publish", "Đăng tin")}>{property.status === 'published' ? <Archive size={17} /> : <Eye size={17} />}</button>
+              <button className="danger" type="button" onClick={() => removeProperty(property)} aria-label={`${t('Delete','Xóa')} ${property.name[language]}`}><Trash2 size={17} /></button>
             </div>
           </article>)}
-          {!filtered.length && <div className="inventory-empty"><Search size={30} /><h2>No properties found</h2><p>Adjust your search or add a new property.</p><button type="button" onClick={openNew}><Plus size={17} /> Add property</button></div>}
+          {!filtered.length && <div className="inventory-empty"><Search size={30} /><h2>{t("No properties found", "Không tìm thấy bất động sản")}</h2><p>{t("Adjust your search or add a new property.", "Thử tìm kiếm khác hoặc thêm bất động sản mới.")}</p><button type="button" onClick={openNew}><Plus size={17} /> {t("Add property", "Thêm bất động sản")}</button></div>}
         </div>
       </section>
 
-      {editor && <div className="editor-backdrop" onMouseDown={() => !saving && setEditor(null)}>
-        <section className="property-editor" role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}>
+      {editor && <div className="editor-backdrop" onMouseDown={() => !saving && !uploading && setEditor(null)}>
+        <section className="property-editor" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}>
           <header className="editor-header">
-            <button type="button" onClick={() => setEditor(null)} aria-label="Close editor"><ArrowLeft size={20} /></button>
-            <div><p>{editor.id ? `PROPERTY #${editor.id}` : 'NEW PROPERTY'}</p><h2 id="editor-title">{editor.id ? 'Edit property' : 'Create a listing'}</h2></div>
-            <button className="editor-save" type="button" onClick={saveProperty} disabled={saving || uploading}>{saving ? <LoaderCircle className="spin" size={18} /> : <Check size={18} />}{saving ? 'Saving…' : 'Save property'}</button>
+            <button type="button" disabled={saving || uploading} onClick={() => setEditor(null)} aria-label={t("Close editor", "Đóng trình chỉnh sửa")}><ArrowLeft size={20} /></button>
+            <div><p>{editor.id ? `${t('PROPERTY','BẤT ĐỘNG SẢN')} #${editor.id}` : t("NEW PROPERTY", "BẤT ĐỘNG SẢN MỚI")}</p><h2 id="editor-title">{editor.id ? t("Edit property", "Chỉnh sửa bất động sản") : t("Create a listing", "Tạo tin đăng mới")}</h2></div>
+            <button className="editor-save" type="button" onClick={saveProperty} disabled={saving || uploading}>{saving ? <LoaderCircle className="spin" size={18} /> : <Check size={18} />}{saving ? t("Saving…", "Đang lưu…") : t("Save property", "Lưu bất động sản")}</button>
           </header>
 
           <div className="editor-body">
             {error && <div className="editor-error"><X size={16} />{error}</div>}
             <section className="editor-section">
-              <div className="editor-section-title"><span>01</span><div><h3>Listing basics</h3><p>Core details shown in search results and cards.</p></div></div>
+              <div className="editor-section-title"><span>01</span><div><h3>{t("Listing basics", "Thông tin cơ bản")}</h3><p>{t("Core details shown in search results and cards.", "Thông tin hiển thị trong kết quả tìm kiếm và thẻ bất động sản.")}</p></div></div>
               <div className="editor-fields two">
-                <label><span>English title *</span><input value={editor.name.en} onChange={(event) => updateLocalized('name', 'en', event.target.value)} placeholder="Oceanview residence" /></label>
-                <label><span>Vietnamese title *</span><input value={editor.name.vi} onChange={(event) => updateLocalized('name', 'vi', event.target.value)} placeholder="Căn hộ view biển" /></label>
-                <label><span>Deal type</span><select value={editor.transactionType} onChange={(event) => updateEditor('transactionType', event.target.value as TransactionType)}><option value="sale">For sale</option><option value="rent">For rent</option></select></label>
-                <label><span>Website status</span><select value={editor.status} onChange={(event) => updateEditor('status', event.target.value as PropertyStatus)}><option value="draft">Draft — hidden</option><option value="published">Live — visible</option><option value="sold">Sold</option><option value="rented">Rented</option><option value="archived">Archived</option></select></label>
-                <label><span>Property type *</span><input value={editor.type} onChange={(event) => updateEditor('type', event.target.value)} placeholder="Apartment" /></label>
-                <label><span>Area *</span><input value={editor.area} onChange={(event) => updateEditor('area', event.target.value)} placeholder="My Khe Beach" /></label>
-                <label><span>Price (VND)</span><input type="number" min="0" value={editor.price} onChange={(event) => updateEditor('price', Number(event.target.value))} /></label>
-                <label><span>URL slug</span><input value={editor.slug} onChange={(event) => updateEditor('slug', event.target.value)} placeholder="Created from English title" /></label>
+                <label><span>{t("English title *", "Tên bằng tiếng Anh *")}</span><input value={editor.name.en} onChange={(event) => updateLocalized('name', 'en', event.target.value)} placeholder={t("Oceanview residence", "Căn hộ hướng biển")} /></label>
+                <label><span>{t("Vietnamese title *", "Tên bằng tiếng Việt *")}</span><input value={editor.name.vi} onChange={(event) => updateLocalized('name', 'vi', event.target.value)} placeholder="Căn hộ view biển" /></label>
+                <label><span>{t("Deal type", "Loại giao dịch")}</span><select value={editor.transactionType} onChange={(event) => updateEditor('transactionType', event.target.value as TransactionType)}><option value="sale">{t("For sale", "Đang bán")}</option><option value="rent">{t("For rent", "Cho thuê")}</option></select></label>
+                <label><span>{t("Website status", "Trạng thái hiển thị")}</span><select value={editor.status} onChange={(event) => updateEditor('status', event.target.value as PropertyStatus)}><option value="draft">{t("Draft — hidden", "Bản nháp — ẩn")}</option><option value="published">{t("Live — visible", "Đã đăng — hiển thị")}</option><option value="sold">{t("Sold", "Đã bán")}</option><option value="rented">{t("Rented", "Đã cho thuê")}</option><option value="archived">{t("Archived", "Đã lưu trữ")}</option></select></label>
+                <label><span>{t("Property type *", "Loại bất động sản *")}</span><input value={editor.type} onChange={(event) => updateEditor('type', event.target.value)} placeholder={t("Apartment","Căn hộ")} /></label>
+                <label><span>{t("Area *", "Khu vực *")}</span><input value={editor.area} onChange={(event) => updateEditor('area', event.target.value)} placeholder={t("My Khe Beach","Biển Mỹ Khê")} /></label>
+                <label><span>{t("Price (VND)", "Giá (VND)")}</span><input type="number" min="0" value={editor.price} onChange={(event) => updateEditor('price', Number(event.target.value))} /></label>
+                <label><span>{t("URL slug", "Đường dẫn tin đăng")}</span><input value={editor.slug} onChange={(event) => updateEditor('slug', event.target.value)} placeholder={t("Created from English title", "Tự tạo từ tên tiếng Anh")} /></label>
               </div>
             </section>
 
             <section className="editor-section">
-              <div className="editor-section-title"><span>02</span><div><h3>Photos</h3><p>Upload up to 12 images. The first image becomes the cover.</p></div></div>
-              <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={(event) => uploadImages(event.target.files)} />
+              <div className="editor-section-title"><span>02</span><div><h3>{t("Photos", "Hình ảnh")}</h3><p>{t("Upload up to 12 images. The first image becomes the cover.", "Tải tối đa 12 ảnh. Ảnh đầu tiên là ảnh bìa.")}</p></div></div>
+              <input ref={fileInput} className="visually-hidden" aria-label={t("Choose property photos","Chọn ảnh bất động sản")} type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={(event) => uploadImages(event.target.files)} />
               <button className="image-drop" type="button" onClick={() => fileInput.current?.click()} disabled={uploading}>
-                {uploading ? <LoaderCircle className="spin" size={27} /> : <ImagePlus size={27} />}<b>{uploading ? 'Uploading images…' : 'Add property photos'}</b><span>JPG, PNG, WebP or AVIF · maximum 8 MB each</span>
+                {uploading ? <LoaderCircle className="spin" size={27} /> : <ImagePlus size={27} />}<b>{uploading ? t("Uploading images…", "Đang tải ảnh…") : t("Add property photos", "Thêm ảnh bất động sản")}</b><span>{t("JPG, PNG, WebP or AVIF · maximum 4 MB each", "JPG, PNG, WebP hoặc AVIF · tối đa 4 MB mỗi ảnh")}</span>
               </button>
-              {!!editor.images.length && <div className="image-grid">{editor.images.map((image, index) => <figure key={`${image}-${index}`}><img src={image} alt="" /><figcaption>{index === 0 ? 'COVER' : String(index + 1).padStart(2, '0')}</figcaption><button type="button" onClick={() => updateEditor('images', editor.images.filter((_, imageIndex) => imageIndex !== index))} aria-label={`Remove image ${index + 1}`}><X size={15} /></button></figure>)}</div>}
+              {!!editor.images.length && <div className="image-grid">{editor.images.map((image, index) => <figure key={`${image}-${index}`}><img src={image} alt="" /><figcaption>{index === 0 ? t("COVER", "ẢNH BÌA") : String(index + 1).padStart(2, '0')}</figcaption>{index > 0 && <button className="make-cover" type="button" onClick={() => updateEditor('images', [image, ...editor.images.filter((_, i) => i !== index)])}>{t('Set cover','Đặt ảnh bìa')}</button>}<button type="button" onClick={() => updateEditor('images', editor.images.filter((_, imageIndex) => imageIndex !== index))} aria-label={`${t('Remove image','Xóa ảnh')} ${index + 1}`}><X size={15} /></button></figure>)}</div>}
             </section>
 
             <section className="editor-section">
-              <div className="editor-section-title"><span>03</span><div><h3>Property facts</h3><p>Measurements, labels and map placement.</p></div></div>
+              <div className="editor-section-title"><span>03</span><div><h3>{t("Property facts", "Chi tiết bất động sản")}</h3><p>{t("Measurements, labels and map placement.", "Diện tích, nhãn và vị trí trên bản đồ.")}</p></div></div>
               <div className="editor-fields four">
-                <label><span>Bedrooms</span><input type="number" min="0" value={editor.beds} onChange={(event) => updateEditor('beds', Number(event.target.value))} /></label>
-                <label><span>Bathrooms</span><input type="number" min="0" value={editor.baths} onChange={(event) => updateEditor('baths', Number(event.target.value))} /></label>
-                <label><span>Size (m²)</span><input type="number" min="1" value={editor.size} onChange={(event) => updateEditor('size', Number(event.target.value))} /></label>
-                <label><span>Display order</span><input type="number" min="0" value={editor.sortOrder} onChange={(event) => updateEditor('sortOrder', Number(event.target.value))} /></label>
-                <label><span>English badge</span><input value={editor.tag.en} onChange={(event) => updateLocalized('tag', 'en', event.target.value)} placeholder="Featured" /></label>
-                <label><span>Vietnamese badge</span><input value={editor.tag.vi} onChange={(event) => updateLocalized('tag', 'vi', event.target.value)} placeholder="Nổi bật" /></label>
-                <label className="range-field"><span>Map horizontal · {editor.x}%</span><input type="range" min="0" max="100" value={editor.x} onChange={(event) => updateEditor('x', Number(event.target.value))} /></label>
-                <label className="range-field"><span>Map vertical · {editor.y}%</span><input type="range" min="0" max="100" value={editor.y} onChange={(event) => updateEditor('y', Number(event.target.value))} /></label>
+                <label><span>{t("Bedrooms", "Phòng ngủ")}</span><input type="number" min="0" value={editor.beds} onChange={(event) => updateEditor('beds', Number(event.target.value))} /></label>
+                <label><span>{t("Bathrooms", "Phòng tắm")}</span><input type="number" min="0" value={editor.baths} onChange={(event) => updateEditor('baths', Number(event.target.value))} /></label>
+                <label><span>{t("Size (m²)", "Diện tích (m²)")}</span><input type="number" min="1" value={editor.size} onChange={(event) => updateEditor('size', Number(event.target.value))} /></label>
+                <label><span>{t("Display order", "Thứ tự hiển thị")}</span><input type="number" min="0" value={editor.sortOrder} onChange={(event) => updateEditor('sortOrder', Number(event.target.value))} /></label>
+                <label><span>{t("English badge", "Nhãn tiếng Anh")}</span><input value={editor.tag.en} onChange={(event) => updateLocalized('tag', 'en', event.target.value)} placeholder={t("Featured", "Nổi bật")} /></label>
+                <label><span>{t("Vietnamese badge", "Nhãn tiếng Việt")}</span><input value={editor.tag.vi} onChange={(event) => updateLocalized('tag', 'vi', event.target.value)} placeholder="Nổi bật" /></label>
+                <label className="range-field"><span>{t('Map horizontal','Vị trí ngang')} · {editor.x}%</span><input type="range" min="0" max="100" value={editor.x} onChange={(event) => updateEditor('x', Number(event.target.value))} /></label>
+                <label className="range-field"><span>{t('Map vertical','Vị trí dọc')} · {editor.y}%</span><input type="range" min="0" max="100" value={editor.y} onChange={(event) => updateEditor('y', Number(event.target.value))} /></label>
               </div>
-              <label className="feature-check"><input type="checkbox" checked={editor.featured} onChange={(event) => updateEditor('featured', event.target.checked)} /><span><Sparkles size={18} /><b>Feature this property</b><small>Prioritise it in the private collection and public inventory.</small></span></label>
+              <label className="feature-check"><input type="checkbox" checked={editor.featured} onChange={(event) => updateEditor('featured', event.target.checked)} /><span><Sparkles size={18} /><b>{t("Feature this property", "Đánh dấu nổi bật")}</b><small>{t("Prioritise it in the private collection and public inventory.", "Ưu tiên hiển thị trong bộ sưu tập và danh sách trên website.")}</small></span></label>
             </section>
 
             <section className="editor-section">
-              <div className="editor-section-title"><span>04</span><div><h3>Descriptions</h3><p>Full bilingual copy for the property details window.</p></div></div>
+              <div className="editor-section-title"><span>04</span><div><h3>{t("Descriptions", "Mô tả")}</h3><p>{t("Full bilingual copy for the property details window.", "Nội dung song ngữ cho trang chi tiết bất động sản.")}</p></div></div>
               <div className="editor-fields two">
-                <label><span>English description</span><textarea rows={6} value={editor.description.en} onChange={(event) => updateLocalized('description', 'en', event.target.value)} /></label>
-                <label><span>Vietnamese description</span><textarea rows={6} value={editor.description.vi} onChange={(event) => updateLocalized('description', 'vi', event.target.value)} /></label>
+                <label><span>{t("English description", "Mô tả tiếng Anh")}</span><textarea rows={6} value={editor.description.en} onChange={(event) => updateLocalized('description', 'en', event.target.value)} /></label>
+                <label><span>{t("Vietnamese description", "Mô tả tiếng Việt")}</span><textarea rows={6} value={editor.description.vi} onChange={(event) => updateLocalized('description', 'vi', event.target.value)} /></label>
               </div>
             </section>
           </div>
 
-          <footer className="editor-footer"><span>{editor.status === 'published' ? <><Eye size={16} /> Changes appear on the website after saving.</> : <><FilePenLine size={16} /> This listing remains hidden until published.</>}</span><div><button type="button" onClick={() => setEditor(null)}>Cancel</button><button className="admin-primary" type="button" onClick={saveProperty} disabled={saving || uploading}>{saving ? <LoaderCircle className="spin" size={18} /> : <Upload size={18} />}{saving ? 'Saving…' : 'Save property'}</button></div></footer>
+          <footer className="editor-footer"><span>{editor.status === 'published' ? <><Eye size={16} /> {t("Changes appear on the website after saving.", "Thay đổi sẽ hiển thị trên website sau khi lưu.")}</> : <><FilePenLine size={16} /> {t("This listing remains hidden until published.", "Tin này vẫn ẩn cho đến khi được đăng.")}</>}</span><div><button type="button" disabled={saving || uploading} onClick={() => setEditor(null)}>{t("Cancel", "Hủy")}</button><button className="admin-primary" type="button" onClick={saveProperty} disabled={saving || uploading}>{saving ? <LoaderCircle className="spin" size={18} /> : <Upload size={18} />}{saving ? t("Saving…", "Đang lưu…") : t("Save property", "Lưu bất động sản")}</button></div></footer>
         </section>
       </div>}
     </main>

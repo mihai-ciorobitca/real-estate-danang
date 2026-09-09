@@ -50,7 +50,7 @@ export default function PropertyCard({ property, language, index, saved, onSave,
         <span><Maximize />{property.size} m²</span>
       </div>
       <div className="card-bottom"><p className="price">{new Intl.NumberFormat('vi-VN').format(property.price)} ₫<small>{property.transactionType === 'rent' ? (en ? 'per month' : 'mỗi tháng') : (en ? 'for sale' : 'đang bán')}</small></p>
-        <button className="quick-view-button" onClick={onOpen}><span>{en ? 'Explore home' : 'Khám phá'}</span><ArrowUpRight size={20} /></button>
+        <button className="quick-view-button" onClick={onOpen} aria-label={en ? `Explore ${property.name.en}` : `Khám phá ${property.name.vi}`}><span>{en ? 'Explore home' : 'Khám phá'}</span><ArrowUpRight size={20} /></button>
       </div>
     </div>
   </article>;

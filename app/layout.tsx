@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono, Manrope } from 'next/font/google';
+import { Geist, Geist_Mono, Manrope, Lora } from 'next/font/google';
 import './globals.css';
 
 function siteUrl() {
@@ -23,11 +23,13 @@ const geistMono = Geist_Mono({
 
 const editorial = Manrope({ variable: '--font-editorial', subsets: ['latin', 'vietnamese'], display: 'swap' });
 
+const display = Lora({ variable: '--font-display', subsets: ['latin', 'vietnamese'], display: 'swap' });
+
 export const metadata: Metadata = {
   metadataBase: siteUrl(),
   title: 'Da Nang Real Estate | Homes for Rent & Sale',
   description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang, with bilingual local support.',
-  icons: { icon: '/icon.png', apple: '/icon.png' },
+  icons: { icon: '/luxury/brand-coastal-v4.png', apple: '/luxury/brand-coastal-v4.png' },
   openGraph: {
     title: 'Da Nang Real Estate | Homes for Rent & Sale',
     description: 'Handpicked apartments, villas and homes for rent or sale in Da Nang.',
@@ -50,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${editorial.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${editorial.variable} ${display.variable} antialiased`}
       >
         {children}
       </body>
