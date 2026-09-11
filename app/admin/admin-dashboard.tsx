@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import LanguageSwitch from '../language-switch';
+import PhotoStudio from './photo-studio';
 import { useAdminLanguage } from './use-admin-language';
 import { adminError } from './error-message';
 import {
   Archive, ArrowLeft, Building2, Check, ChevronDown, Eye, FilePenLine,
-  ImagePlus, LayoutDashboard, LoaderCircle, LogOut, MapPin, Plus, Search, Sparkles,
+  LayoutDashboard, LoaderCircle, LogOut, MapPin, Plus, Search, Sparkles,
   Trash2, Upload, X,
 } from 'lucide-react';
 import type { PropertyInput, PropertyRecord, PropertyStatus, TransactionType } from '@/lib/property-types';
@@ -68,7 +69,27 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const fileInput = useRef<HTMLInputElement>(null);
+  const draftKey = 'dnre-editor-draft:' + currentUser;
+  const [draftReady, setDraftReady] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+    if (!preview) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
+        if (saved && Array.isArray(saved.images) && saved.name && saved.description) setEditor(saved);
+      } catch {}
+    }
+    setDraftReady(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [draftKey, preview]);
+  useEffect(() => {
+    if (!draftReady || preview) return;
+    try {
+      if (editor) sessionStorage.setItem(draftKey, JSON.stringify(editor));
+      else sessionStorage.removeItem(draftKey);
+    } catch {}
+  }, [editor, draftKey, draftReady, preview]);
 
   const dialogRef = useRef<HTMLElement>(null);
   const editorOpen = editor !== null;
@@ -122,7 +143,7 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
   }
 
   async function saveProperty() {
-    if (!editor) return;
+    if (!editor || uploading || saving) return;
     if (!editor.name.en.trim() || !editor.name.vi.trim() || !editor.area.trim() || !editor.type.trim()) { setError(t('Complete both titles, area and property type.','Vui lòng nhập tên ở cả hai ngôn ngữ, khu vực và loại bất động sản.')); return; }
     if (!Number.isFinite(editor.price) || editor.price < 0 || editor.size < 1) { setError(t('Enter a valid price and size.','Vui lòng nhập giá và diện tích hợp lệ.')); return; }
     if (editor.status === 'published' && !editor.images.length) { setError(t('Add at least one image before publishing.','Thêm ít nhất một ảnh trước khi đăng tin.')); return; }
@@ -173,24 +194,6 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
     } catch (caught) { setError(caught instanceof Error ? adminError(caught.message, language) : t("Could not delete this property.", "Không thể xóa bất động sản.")); }
   }
 
-  async function uploadImages(files: FileList | null) {
-    if (!editor || !files?.length) return;
-    if (preview) { setError(t('Uploads are available in the signed-in dashboard.','Đăng nhập bảng quản trị để tải ảnh lên.')); return; }
-    setUploading(true); setError('');
-    try {
-      if (editor.images.length + files.length > 12) throw new Error(t('A maximum of 12 images is allowed.','Chỉ được tải tối đa 12 ảnh.'));
-      if (Array.from(files).some(file => file.size > 4 * 1024 * 1024)) throw new Error(t('Each image must be smaller than 4 MB.','Mỗi ảnh phải nhỏ hơn 4 MB.'));
-      for (const file of Array.from(files)) {
-        const body = new FormData(); body.append('file', file);
-        const response = await fetch('/api/admin/uploads', { method: 'POST', body });
-        const data = await response.json() as { url?: string; error?: string };
-        if (!response.ok || !data.url) throw new Error(data.error ?? t(`Could not upload ${file.name}.`, `Không thể tải ảnh ${file.name}.`));
-        const url = data.url; setEditor(current => current ? { ...current, images: [...current.images, url] } : current);
-      }
-
-    } catch (caught) { setError(caught instanceof Error ? adminError(caught.message, language) : t("Image upload failed.", "Không thể tải ảnh lên.")); }
-    finally { setUploading(false); if (fileInput.current) fileInput.current.value = ''; }
-  }
 
   return (
     <main className="admin-shell" lang={language}>
@@ -283,11 +286,7 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
 
             <section className="editor-section">
               <div className="editor-section-title"><span>02</span><div><h3>{t("Photos", "Hình ảnh")}</h3><p>{t("Upload up to 12 images. The first image becomes the cover.", "Tải tối đa 12 ảnh. Ảnh đầu tiên là ảnh bìa.")}</p></div></div>
-              <input ref={fileInput} className="visually-hidden" aria-label={t("Choose property photos","Chọn ảnh bất động sản")} type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={(event) => uploadImages(event.target.files)} />
-              <button className="image-drop" type="button" onClick={() => fileInput.current?.click()} disabled={uploading}>
-                {uploading ? <LoaderCircle className="spin" size={27} /> : <ImagePlus size={27} />}<b>{uploading ? t("Uploading images…", "Đang tải ảnh…") : t("Add property photos", "Thêm ảnh bất động sản")}</b><span>{t("JPG, PNG, WebP or AVIF · maximum 4 MB each", "JPG, PNG, WebP hoặc AVIF · tối đa 4 MB mỗi ảnh")}</span>
-              </button>
-              {!!editor.images.length && <div className="image-grid">{editor.images.map((image, index) => <figure key={`${image}-${index}`}><img src={image} alt="" /><figcaption>{index === 0 ? t("COVER", "ẢNH BÌA") : String(index + 1).padStart(2, '0')}</figcaption>{index > 0 && <button className="make-cover" type="button" onClick={() => updateEditor('images', [image, ...editor.images.filter((_, i) => i !== index)])}>{t('Set cover','Đặt ảnh bìa')}</button>}<button type="button" onClick={() => updateEditor('images', editor.images.filter((_, imageIndex) => imageIndex !== index))} aria-label={`${t('Remove image','Xóa ảnh')} ${index + 1}`}><X size={15} /></button></figure>)}</div>}
+              <PhotoStudio key={editor.id ?? 'new'} scope={currentUser + ':' + (editor.id ?? 'new')} images={editor.images} onChange={images => updateEditor('images', images)} onBusy={setUploading} language={language} preview={preview} />
             </section>
 
             <section className="editor-section">

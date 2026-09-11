@@ -12,7 +12,7 @@ type PropertyRow = {
 
 let client: ReturnType<typeof postgres> | null = null;
 
-function database() {
+export function database() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured.');
   client ??= postgres(process.env.DATABASE_URL, {
     max: 1,
