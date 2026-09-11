@@ -93,23 +93,25 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
 
   const dialogRef = useRef<HTMLElement>(null);
   const editorOpen = editor !== null;
+  const editorBusy = useRef(false);
+  useEffect(() => { editorBusy.current = saving || uploading; }, [saving, uploading]);
   useEffect(() => {
     if (!editorOpen) return;
     const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    dialogRef.current?.focus({ preventScroll: true });
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving && !uploading) setEditor(null);
+      if (event.key === 'Escape' && !editorBusy.current) setEditor(null);
       if (event.key !== 'Tab') return;
       const nodes = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,textarea,a[href]') || []).filter(node => node.offsetParent !== null);
       const first = nodes[0], last = nodes[nodes.length-1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { event.preventDefault(); first?.focus(); }
     };
     document.addEventListener('keydown', keydown);
     return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); previous?.focus(); };
-  }, [editorOpen, saving, uploading]);
+  }, [editorOpen]);
   const filtered = useMemo(() => properties.filter((property) => {
     const needle = query.trim().toLowerCase();
     const matchesQuery = !needle || [property.name.en, property.name.vi, property.area, property.type, property.slug]
@@ -261,7 +263,7 @@ export default function AdminDashboard({ initialProperties, currentUser, signOut
       </section>
 
       {editor && <div className="editor-backdrop" onMouseDown={() => !saving && !uploading && setEditor(null)}>
-        <section className="property-editor" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}>
+        <section className="property-editor" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="editor-title" onMouseDown={(event) => event.stopPropagation()}>
           <header className="editor-header">
             <button type="button" disabled={saving || uploading} onClick={() => setEditor(null)} aria-label={t("Close editor", "Đóng trình chỉnh sửa")}><ArrowLeft size={20} /></button>
             <div><p>{editor.id ? `${t('PROPERTY','BẤT ĐỘNG SẢN')} #${editor.id}` : t("NEW PROPERTY", "BẤT ĐỘNG SẢN MỚI")}</p><h2 id="editor-title">{editor.id ? t("Edit property", "Chỉnh sửa bất động sản") : t("Create a listing", "Tạo tin đăng mới")}</h2></div>
