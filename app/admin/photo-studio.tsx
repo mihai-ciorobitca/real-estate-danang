@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, Grip, ImagePlus, LoaderCircle, Pause, Pla
 import { movePhoto, type PhotoJob } from '@/lib/photo-job-types';
 import type { SiteLanguage } from '../language-switch';
 import './photo-studio.css';
+import { usePhotoHold } from './use-photo-hold';
 
 type Task = Omit<PhotoJob, 'state'> & { state: PhotoJob['state'] | 'queued' };
 type Props = { images: string[]; onChange: (images: string[]) => void; onBusy: (busy: boolean) => void; language: SiteLanguage; scope: string; preview?: boolean };
@@ -180,6 +181,7 @@ export default function PhotoStudio({ images, onChange, onBusy, language, scope,
     latest.current.onChange(movePhoto(latest.current.images, from, to));
     setAnnouncement(t(`Photo ${from + 1} moved to position ${to + 1}.`, `Đã chuyển ảnh ${from + 1} đến vị trí ${to + 1}.`));
   }
+  usePhotoHold(grid, images, move, (from, to) => { setDragging(from); setOver(to); });
   const first = pending[0];
   const elapsed = first ? Math.max(0, Math.floor((now - Date.parse(first.createdAt)) / 1000)) : 0;
   const timerText = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
@@ -187,7 +189,7 @@ export default function PhotoStudio({ images, onChange, onBusy, language, scope,
   const complete = relevant.filter(task => task.state === 'completed').length;
   return <div className="photo-studio">
     <div className="photo-studio-intro"><span className="photo-studio-icon"><Sparkles size={24} /></span><div><p>PHOTO STUDIO · 4K</p><h4>{t('Beautiful light. Every detail.', 'Ánh sáng đẹp. Trọn từng chi tiết.')}</h4><span>{t('Upload → arrange → automatic enhancement → review & save.', 'Tải ảnh → sắp xếp → tự động nâng cấp → kiểm tra và lưu.')}</span></div><b>GPT 2.5<span>MEDIUM</span></b></div>
-    <p className="photo-guidance">{t('Drag the grip to reorder, or use the arrows on any device. Photo 1 is the cover. New photos are automatically enhanced; originals remain available.', 'Kéo biểu tượng để đổi thứ tự hoặc dùng mũi tên trên mọi thiết bị. Ảnh 1 là ảnh bìa. Ảnh mới tự động được nâng cấp; vẫn giữ lại ảnh gốc.')}</p>
+    <p className="photo-guidance">{t('Hold a photo briefly, then drag it to a new position. Hold near the top or bottom to scroll. You can also use the grip or arrows. Photo 1 is the cover. New photos are automatically enhanced; originals remain available.', 'Nhấn giữ ảnh một chút, rồi kéo đến vị trí mới. Giữ gần mép trên hoặc dưới để cuộn. Bạn cũng có thể dùng biểu tượng kéo hoặc mũi tên. Ảnh 1 là ảnh bìa. Ảnh mới tự động được nâng cấp; vẫn giữ lại ảnh gốc.')}</p>
     <input ref={input} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple aria-label={t('Choose property photos','Chọn ảnh bất động sản')} onChange={event => void upload(event.target.files)} />
     <button className="photo-add" type="button" disabled={uploading || !ready || images.length >= 12} onClick={() => input.current?.click()}><ImagePlus size={23} /><span><strong>{uploading ? t('Uploading…','Đang tải lên…') : t('Add photos','Thêm ảnh')}</strong><small>{uploadStatus || t('Up to 12 photos · phone photos compressed automatically','Tối đa 12 ảnh · tự động nén ảnh điện thoại')}</small></span><b>{images.length}/12</b></button>
     {error && <div className="photo-error" role="alert">{error === 'limit' ? t('A maximum of 12 photos is allowed.','Tối đa 12 ảnh.') : explain(error)}<button type="button" aria-label={t('Dismiss','Đóng')} onClick={() => setError('')}><X size={16} /></button></div>}

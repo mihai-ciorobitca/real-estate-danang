@@ -11,3 +11,6 @@
 .photo-error { margin:14px 0; padding:14px; background:#f9e9df; color:#803e29; display:flex; gap:12px; font-size:12px; line-height:1.6; border-radius:8px; }.photo-error button { margin-left:auto; align-self:flex-start; border:0; color:inherit; background:transparent; }.photo-footnote { font-size:10px; line-height:1.8; color:#7a8175; margin:18px 0 0; }
 @media(max-width:600px) { .photo-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.photo-studio-intro { padding:18px 15px; gap:10px; }.photo-studio-icon { display:none; }.photo-studio-intro h4 { font-size:21px; }.photo-studio-intro>b { font-size:10px; }.photo-guidance { padding:13px; }.photo-progress>div { flex-wrap:wrap; }.photo-add { padding:14px 12px; }.photo-number { left:6px; top:6px; padding:5px; font-size:12px; }.photo-number small { font-size:7px; } }
 @media(prefers-reduced-motion:reduce) { .photo-card { transition:none; }.photo-studio .spin { animation:none; } }
+
+.photo-preview, .photo-preview img { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+.photo-card.is-dragging { opacity:.75; outline:3px solid #c09754; outline-offset:-3px; box-shadow:0 8px 24px #173d3940; }
